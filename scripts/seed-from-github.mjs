@@ -2,7 +2,7 @@ import dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 import { createClient } from '@supabase/supabase-js'
 import { v2 as cloudinary } from 'cloudinary'
-import fetch from 'node-fetch'
+// Using Node 18+ native fetch (no node-fetch needed)
 
 // STEP 2 — CONFIGURE CLIENTS
 const supabase = createClient(
@@ -202,7 +202,7 @@ async function main() {
         throw new Error(`404 or bad response on image download: ${c.image_path}`)
       }
       
-      const buffer = await imgRes.buffer()
+      const buffer = Buffer.from(await imgRes.arrayBuffer())
       const base64 = buffer.toString('base64')
       const mime = imgRes.headers.get('content-type') || 'image/jpeg'
 
