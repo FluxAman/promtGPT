@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import PromptCard from "@/components/PromptCard";
 import type { Metadata } from "next";
 import { User, Bookmark, Activity } from "lucide-react";
@@ -10,7 +11,12 @@ export const metadata: Metadata = {
   description: "Your saved prompts and activity on PromptGPT.",
 };
 
-export default async function ProfilePage() {
+interface ProfilePageProps {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export default async function ProfilePage({ searchParams }: ProfilePageProps) {
+  const { tab = "saved" } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -25,8 +31,17 @@ export default async function ProfilePage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
+  // Fetch user's own uploads
+  const { data: uploadedPrompts } = await supabase
+    .from("prompts")
+    .select("*, category:categories(*)")
+    .eq("created_by", user.id)
+    .order("created_at", { ascending: false });
+
   const avatarUrl = user.user_metadata?.avatar_url;
   const name = user.user_metadata?.full_name || user.email;
+  const totalSaved = savedPrompts?.length ?? 0;
+  const totalUploaded = uploadedPrompts?.length ?? 0;
 
   return (
     <div className="min-h-screen max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -52,48 +67,88 @@ export default async function ProfilePage() {
           <h1 className="text-2xl font-bold text-white">{name}</h1>
           <p className="text-zinc-500 text-sm">{user.email}</p>
           <p className="text-zinc-600 text-xs mt-1">
-            {savedPrompts?.length ?? 0} saved prompt{savedPrompts?.length !== 1 ? "s" : ""}
+            {totalSaved} saved • {totalUploaded} uploaded
           </p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1">
-        <div className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-white border-b-2 border-red-500">
+        <Link
+          href="/profile?tab=saved"
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            tab === "saved"
+              ? "text-white border-red-500"
+              : "text-zinc-500 border-transparent hover:text-zinc-300"
+          }`}
+        >
           <Bookmark className="w-4 h-4" />
           Saved Prompts
-        </div>
-        <div className="flex items-center gap-2 px-4 py-3 text-sm text-zinc-500 cursor-not-allowed">
+        </Link>
+        <Link
+          href="/profile?tab=activity"
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            tab === "activity"
+              ? "text-white border-red-500"
+              : "text-zinc-500 border-transparent hover:text-zinc-300"
+          }`}
+        >
           <Activity className="w-4 h-4" />
-          Activity
-        </div>
+          My Uploads
+        </Link>
       </div>
 
-      {/* Saved prompts grid */}
-      {savedPrompts && savedPrompts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {savedPrompts.map((sp) =>
-            sp.prompt ? (
-              <PromptCard key={sp.id} prompt={sp.prompt} />
-            ) : null
-          )}
-        </div>
-      ) : (
-        <div className="text-center py-24">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-            <Bookmark className="w-8 h-8 text-zinc-600" />
+      {/* Tab content */}
+      {tab === "activity" ? (
+        uploadedPrompts && uploadedPrompts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {uploadedPrompts.map((p) => (
+              <PromptCard key={p.id} prompt={p} showCategory={true} showEditButton={true} />
+            ))}
           </div>
-          <h2 className="text-xl font-semibold text-zinc-300 mb-2">No saved prompts yet</h2>
-          <p className="text-zinc-500 text-sm mb-6">
-            Browse prompts and click the heart icon to save them here.
-          </p>
-          <a
-            href="/search"
-            className="px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
-          >
-            Browse prompts
-          </a>
-        </div>
+        ) : (
+          <div className="text-center py-24">
+            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+              <Activity className="w-8 h-8 text-zinc-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-zinc-300 mb-2">No uploads yet</h2>
+            <p className="text-zinc-500 text-sm mb-6">
+              Share your best AI image prompts with the community.
+            </p>
+            <Link
+              href="/submit"
+              className="px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+            >
+              Submit a prompt
+            </Link>
+          </div>
+        )
+      ) : (
+        savedPrompts && savedPrompts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {savedPrompts.map((sp) =>
+              sp.prompt ? (
+                <PromptCard key={sp.id} prompt={sp.prompt} />
+              ) : null
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-24">
+            <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+              <Bookmark className="w-8 h-8 text-zinc-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-zinc-300 mb-2">No saved prompts yet</h2>
+            <p className="text-zinc-500 text-sm mb-6">
+              Browse prompts and click the heart icon to save them here.
+            </p>
+            <Link
+              href="/search"
+              className="px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+            >
+              Browse prompts
+            </Link>
+          </div>
+        )
       )}
     </div>
   );

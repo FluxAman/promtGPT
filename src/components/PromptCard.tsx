@@ -7,9 +7,10 @@ import CopyButton from "./CopyButton";
 interface PromptCardProps {
   prompt: Prompt;
   showCategory?: boolean;
+  showEditButton?: boolean;
 }
 
-export default function PromptCard({ prompt, showCategory = true }: PromptCardProps) {
+export default function PromptCard({ prompt, showCategory = true, showEditButton = false }: PromptCardProps) {
   return (
     <Link
       href={`/prompt/${prompt.id}`}
@@ -61,12 +62,25 @@ export default function PromptCard({ prompt, showCategory = true }: PromptCardPr
             <Copy className="w-3.5 h-3.5" />
             <span>{prompt.copy_count.toLocaleString()} copies</span>
           </div>
-          <div className="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-            <CopyButton
-              promptId={prompt.id}
-              promptText={prompt.prompt_text}
-              variant="icon"
-            />
+          <div className="flex items-center gap-2">
+            {showEditButton && (
+              <Link
+                href={`/prompt/${prompt.id}/edit`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 hover:text-white border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition-colors relative z-10"
+              >
+                Edit
+              </Link>
+            )}
+            <div className="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+              <CopyButton
+                promptId={prompt.id}
+                promptText={prompt.prompt_text}
+                variant="icon"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -4,26 +4,29 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Upload, ImageIcon, Loader2 } from "lucide-react";
-import type { Category } from "@/types";
+import { Upload, ImageIcon, Loader2, ArrowLeft } from "lucide-react";
+import type { Category, Prompt } from "@/types";
+import Link from "next/link";
 
-export default function SubmitPromptPage() {
-  const [user, setUser] = useState<{ email: string } | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+interface EditPromptFormProps {
+  prompt: Prompt;
+  categories: Category[];
+}
+
+export default function EditPromptForm({ prompt, categories }: EditPromptFormProps) {
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
-  const [title, setTitle] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [tags, setTags] = useState("");
-  const [promptText, setPromptText] = useState("");
+  const [title, setTitle] = useState(prompt.title);
+  const [categoryId, setCategoryId] = useState(prompt.category_id || "");
+  const [tags, setTags] = useState(prompt.tags?.join(", ") || "");
+  const [promptText, setPromptText] = useState(prompt.prompt_text);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(prompt.image_url);
 
   // Crop/Position state
   const [originalFile, setOriginalFile] = useState<File | null>(null);
-  const [originalSrc, setOriginalSrc] = useState<string | null>(null);
+  const [originalSrc, setOriginalSrc] = useState<string | null>(prompt.image_url);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -34,6 +37,8 @@ export default function SubmitPromptPage() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  const router = useRouter();
+
   const viewportRefCallback = (node: HTMLDivElement | null) => {
     (viewportRef as any).current = node;
     if (node) {
@@ -43,23 +48,6 @@ export default function SubmitPromptPage() {
       });
     }
   };
-
-  const router = useRouter();
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) { router.push("/"); return; }
-
-      const email = data.user.email ?? "";
-      setUser({ email });
-      
-      // Fetch categories
-      const { data: cats } = await supabase.from("categories").select("*").order("name");
-      setCategories(cats ?? []);
-      setLoading(false);
-    });
-  }, [router]);
 
   useEffect(() => {
     if (dimensions.width > 0 && viewportSize) {
@@ -200,7 +188,7 @@ export default function SubmitPromptPage() {
   };
 
   const handleApplyCrop = () => {
-    if (!viewportSize || !imgRef.current || !originalFile) return;
+    if (!viewportSize || !imgRef.current) return;
     
     const canvas = document.createElement("canvas");
     canvas.width = 1200;
@@ -242,65 +230,69 @@ export default function SubmitPromptPage() {
     canvas.toBlob(
       (blob) => {
         if (blob) {
-          const croppedFile = new File([blob], originalFile.name, {
-            type: originalFile.type || "image/jpeg",
-          });
+          const name = originalFile?.name || "image.jpg";
+          const type = originalFile?.type || "image/jpeg";
+          const croppedFile = new File([blob], name, { type });
           setImageFile(croppedFile);
           setImagePreview(URL.createObjectURL(croppedFile));
           setCropModalOpen(false);
         }
       },
-      originalFile.type || "image/jpeg",
+      originalFile?.type || "image/jpeg",
       0.95
     );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !categoryId || !promptText || !imageFile) {
-      toast.error("Please fill in all required fields and select an image.");
+    if (!title || !categoryId || !promptText || !imagePreview) {
+      toast.error("Please fill in all required fields.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // 1. Upload image to Cloudinary via API
-      const formData = new FormData();
-      formData.append("file", imageFile);
-      const uploadRes = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      let imageUrl = prompt.image_url;
 
-      if (!uploadRes.ok) {
-        const err = await uploadRes.json();
-        throw new Error(err.error || "Image upload failed");
+      // 1. Upload new image if it was changed
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json();
+          throw new Error(err.error || "Image upload failed");
+        }
+        const data = await uploadRes.json();
+        imageUrl = data.url;
       }
-      const { url: imageUrl } = await uploadRes.json();
 
-      // 2. Insert prompt into Supabase
+      // 2. Update prompt in Supabase
       const supabase = createClient();
-      const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase.from("prompts").insert({
-        title,
-        prompt_text: promptText,
-        image_url: imageUrl,
-        category_id: categoryId,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        created_by: userData.user?.id,
-        is_approved: true,
-      });
+      const { error } = await supabase
+        .from("prompts")
+        .update({
+          title,
+          prompt_text: promptText,
+          image_url: imageUrl,
+          category_id: categoryId,
+          tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+          is_approved: true, // Keep it approved
+        })
+        .eq("id", prompt.id);
 
       if (error) throw new Error(error.message);
 
-      toast.success("Prompt uploaded successfully! 🎉");
-      // Reset form
-      setTitle(""); setCategoryId(""); setTags(""); setPromptText("");
-      setImageFile(null); setImagePreview(null);
-      setOriginalFile(null); setOriginalSrc(null);
+      toast.success("Prompt updated successfully! 🎉");
+      router.push("/profile?tab=activity");
+      router.refresh();
     } catch (err: unknown) {
-      toast.error((err as Error).message || "Upload failed. Please try again.");
+      toast.error((err as Error).message || "Update failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -326,19 +318,18 @@ export default function SubmitPromptPage() {
   const currentWidth = baseWidth * zoom;
   const currentHeight = baseHeight * zoom;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-red-400 animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen max-w-2xl mx-auto px-4 sm:px-6 py-12">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Submit Prompt</h1>
-        <p className="text-zinc-500 text-sm mt-1">Share your best AI image prompts with the community. Signed in as {user?.email}</p>
+        <Link
+          href="/profile?tab=activity"
+          className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to uploads
+        </Link>
+        <h1 className="text-2xl font-bold text-white">Edit Prompt</h1>
+        <p className="text-zinc-500 text-sm mt-1">Make adjustments to your prompt and sample photo.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -475,12 +466,12 @@ export default function SubmitPromptPage() {
           {submitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Uploading…
+              Saving Changes…
             </>
           ) : (
             <>
               <Upload className="w-4 h-4" />
-              Submit Prompt
+              Save Changes
             </>
           )}
         </button>
@@ -528,6 +519,7 @@ export default function SubmitPromptPage() {
                 src={originalSrc}
                 alt="Crop preview"
                 onLoad={handleImageLoaded}
+                crossOrigin="anonymous"
                 style={{
                   position: "absolute",
                   left: `${position.x}px`,
