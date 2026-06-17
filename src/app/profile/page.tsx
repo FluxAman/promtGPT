@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import PromptCard from "@/components/PromptCard";
 import type { Metadata } from "next";
-import { User, Bookmark, Activity } from "lucide-react";
+import { User, Bookmark, UploadCloud } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "My Profile",
@@ -16,7 +16,7 @@ interface ProfilePageProps {
 }
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
-  const { tab = "saved" } = await searchParams;
+  const { tab = "submissions" } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -75,6 +75,17 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
       {/* Tabs */}
       <div className="flex border-b border-zinc-800 mb-8 gap-1">
         <Link
+          href="/profile?tab=submissions"
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            tab === "submissions"
+              ? "text-white border-red-500"
+              : "text-zinc-500 border-transparent hover:text-zinc-300"
+          }`}
+        >
+          <UploadCloud className="w-4 h-4" />
+          My Submissions
+        </Link>
+        <Link
           href="/profile?tab=saved"
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
             tab === "saved"
@@ -85,33 +96,22 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
           <Bookmark className="w-4 h-4" />
           Saved Prompts
         </Link>
-        <Link
-          href="/profile?tab=activity"
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            tab === "activity"
-              ? "text-white border-red-500"
-              : "text-zinc-500 border-transparent hover:text-zinc-300"
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          My Uploads
-        </Link>
       </div>
 
       {/* Tab content */}
-      {tab === "activity" ? (
+      {tab === "submissions" ? (
         uploadedPrompts && uploadedPrompts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {uploadedPrompts.map((p) => (
-              <PromptCard key={p.id} prompt={p} showCategory={true} showEditButton={true} />
+              <PromptCard key={p.id} prompt={p} showCategory={true} showEditButton={true} showDeleteButton={true} />
             ))}
           </div>
         ) : (
           <div className="text-center py-24">
             <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
-              <Activity className="w-8 h-8 text-zinc-600" />
+              <UploadCloud className="w-8 h-8 text-zinc-600" />
             </div>
-            <h2 className="text-xl font-semibold text-zinc-300 mb-2">No uploads yet</h2>
+            <h2 className="text-xl font-semibold text-zinc-300 mb-2">No submissions yet</h2>
             <p className="text-zinc-500 text-sm mb-6">
               Share your best AI image prompts with the community.
             </p>

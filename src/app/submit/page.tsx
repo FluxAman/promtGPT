@@ -295,10 +295,9 @@ export default function SubmitPromptPage() {
       if (error) throw new Error(error.message);
 
       toast.success("Prompt uploaded successfully! 🎉");
-      // Reset form
-      setTitle(""); setCategoryId(""); setTags(""); setPromptText("");
-      setImageFile(null); setImagePreview(null);
-      setOriginalFile(null); setOriginalSrc(null);
+      // Redirect to profile submissions tab so the user can see their new post
+      router.push("/profile?tab=submissions");
+      router.refresh();
     } catch (err: unknown) {
       toast.error((err as Error).message || "Upload failed. Please try again.");
     } finally {

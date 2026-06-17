@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Upload, ImageIcon, Loader2, ArrowLeft } from "lucide-react";
+import { Upload, ImageIcon, Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import type { Category, Prompt } from "@/types";
 import Link from "next/link";
 
@@ -15,6 +15,8 @@ interface EditPromptFormProps {
 
 export default function EditPromptForm({ prompt, categories }: EditPromptFormProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Form state
   const [title, setTitle] = useState(prompt.title);
@@ -289,7 +291,7 @@ export default function EditPromptForm({ prompt, categories }: EditPromptFormPro
       if (error) throw new Error(error.message);
 
       toast.success("Prompt updated successfully! 🎉");
-      router.push("/profile?tab=activity");
+      router.push("/profile?tab=submissions");
       router.refresh();
     } catch (err: unknown) {
       toast.error((err as Error).message || "Update failed. Please try again.");
@@ -322,11 +324,11 @@ export default function EditPromptForm({ prompt, categories }: EditPromptFormPro
     <div className="min-h-screen max-w-2xl mx-auto px-4 sm:px-6 py-12">
       <div className="mb-8">
         <Link
-          href="/profile?tab=activity"
+          href="/profile?tab=submissions"
           className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to uploads
+          Back to submissions
         </Link>
         <h1 className="text-2xl font-bold text-white">Edit Prompt</h1>
         <p className="text-zinc-500 text-sm mt-1">Make adjustments to your prompt and sample photo.</p>
@@ -475,6 +477,26 @@ export default function EditPromptForm({ prompt, categories }: EditPromptFormPro
             </>
           )}
         </button>
+
+        {/* Delete Button */}
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          disabled={deleting || submitting}
+          className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl bg-zinc-900 hover:bg-red-600/10 border border-zinc-700 hover:border-red-500/30 text-zinc-400 hover:text-red-400 disabled:opacity-50 font-medium transition-all"
+        >
+          {deleting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Deleting…
+            </>
+          ) : (
+            <>
+              <Trash2 className="w-4 h-4" />
+              Delete Prompt
+            </>
+          )}
+        </button>
       </form>
 
       {/* Crop Modal */}
@@ -565,6 +587,75 @@ export default function EditPromptForm({ prompt, categories }: EditPromptFormPro
                 className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2"
               >
                 Apply Crop
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete Prompt</h3>
+                <p className="text-zinc-500 text-xs">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-400 mb-6">
+              Are you sure you want to delete &ldquo;{prompt.title}&rdquo;? This will permanently remove the prompt and all associated saves.
+            </p>
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-zinc-400 hover:text-white font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDeleting(true);
+                  try {
+                    const res = await fetch(`/api/prompts/${prompt.id}`, {
+                      method: "DELETE",
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                      throw new Error(data.error || "Failed to delete prompt");
+                    }
+                    toast.success("Prompt deleted successfully!");
+                    router.push("/profile?tab=submissions");
+                    router.refresh();
+                  } catch (err: unknown) {
+                    toast.error((err as Error).message || "Delete failed. Please try again.");
+                  } finally {
+                    setDeleting(false);
+                    setShowDeleteConfirm(false);
+                  }
+                }}
+                disabled={deleting}
+                className="px-5 py-2 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting…
+                  </>
+                ) : (
+                  "Yes, Delete"
+                )}
               </button>
             </div>
           </div>
