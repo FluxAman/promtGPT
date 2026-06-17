@@ -42,22 +42,6 @@ cp .env.example .env.local
 npm run dev
 ```
 
-### Environment Variables
-
-Create a `.env.local` file with:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-
-ADMIN_EMAILS=your@email.com
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-```
 
 ## Project Structure
 
