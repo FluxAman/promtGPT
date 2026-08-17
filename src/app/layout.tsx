@@ -28,6 +28,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "PromptGPT — AI Image Prompt Library",
   },
+  verification: {
+    google: "1_FdSzSXoTdC2TljHOYqMoSwXv6sQrt3GRBXKkxZlhU",
+  },
 };
 
 export default function RootLayout({
